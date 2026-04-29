@@ -1,0 +1,237 @@
+"""Authentication for the CatGenie API.
+
+The CatGenie app uses phone-number + SMS code authentication:
+1. POST generateLoginCode/v2  → triggers SMS to the user's phone
+2. POST loginByPhoneNumber/v2 → exchanges phone + code for JWT + refresh token
+
+The phone number is sent encrypted in a "str1" field:
+  str1 = AES-CBC("+{countryCode}{phone}-{random8chars}", static_key, zero_iv)
+
+generateLoginCode requires only x-pm-en-dec/x-pm-en-ver/x-render-t headers.
+loginByPhoneNumber additionally requires y-pm-sg-b/y-pm-sg-p HMAC signatures
+*in the captured app traffic*, but the server does NOT validate them — login
+succeeds without the signing secret.
+
+The refresh token is very long-lived (~10 years) and can be used to obtain
+short-lived access tokens (30-minute expiry) via the refreshToken/v2 endpoint.
+
+CRITICAL: requests must be sent with a mobile/browser TLS fingerprint
+(via curl_cffi `impersonate`). Python stdlib SSL is silently filtered at
+the edge — server returns 200 OK / empty body but never sends the SMS.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from dataclasses import dataclass
+from types import TracebackType
+from typing import Any, Literal, cast
+
+from curl_cffi.requests import AsyncSession, Response
+
+from .const import (
+    BASE_URL,
+    DEFAULT_HEADERS,
+    ENDPOINT_CONFIG_URL,
+    ENDPOINT_GENERATE_LOGIN_CODE,
+    ENDPOINT_LOGIN_BY_PHONE,
+    ENDPOINT_REFRESH_TOKEN,
+    TLS_IMPERSONATE,
+)
+from .signing import encrypt_str1, generate_request_headers
+
+_HttpMethod = Literal[
+    "GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE", "PATCH", "QUERY"
+]
+
+
+@dataclass
+class Credentials:
+    """Stored authentication state."""
+
+    access_token: str = ""
+    refresh_token: str = ""
+    secret: str = ""  # 84-char HMAC signing secret (optional — server doesn't validate)
+    token_expiration: float = 0.0  # Unix timestamp (seconds)
+    account_id: str = ""
+    user_id: str = ""
+    tenant_id: str = ""
+
+    @property
+    def is_token_expired(self) -> bool:
+        return not self.access_token or time.time() >= self.token_expiration
+
+
+class AuthenticationError(Exception):
+    """Raised when authentication fails."""
+
+
+class CatGenieAuth:
+    """Handles the CatGenie phone-number authentication flow.
+
+    Usage:
+        async with CatGenieAuth() as auth:
+            await auth.request_login_code(country_code=60, phone="400000000")
+            code = input("SMS code: ")
+            creds = await auth.login(country_code=60, phone="400000000", code=code)
+    """
+
+    def __init__(
+        self,
+        session: AsyncSession[Response] | None = None,
+        base_url: str = BASE_URL,
+        secret: str = "",
+    ) -> None:
+        self._session: AsyncSession[Response] | None = session
+        self._owns_session = session is None
+        self._base_url = base_url.rstrip("/")
+        self._secret = secret
+        self.credentials = Credentials(secret=secret)
+
+    async def __aenter__(self) -> CatGenieAuth:
+        if self._session is None:
+            self._session = AsyncSession(impersonate=TLS_IMPERSONATE)
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        if self._owns_session and self._session is not None:
+            await self._session.close()
+            self._session = None
+
+    def _url(self, path: str) -> str:
+        return f"{self._base_url}/{path.lstrip('/')}"
+
+    def _build_headers(
+        self,
+        path: str,
+        method: str,
+        body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        require_hmac: bool = True,
+    ) -> dict[str, str]:
+        headers = dict(DEFAULT_HEADERS)
+        secret = self.credentials.secret or self._secret if require_hmac else ""
+        headers.update(
+            generate_request_headers(
+                path=path,
+                method=method,
+                body=body,
+                params=params,
+                secret=secret,
+            )
+        )
+        return headers
+
+    async def _request(
+        self,
+        method: _HttpMethod,
+        path: str,
+        body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        require_hmac: bool = True,
+        token: str = "",
+    ) -> Any:
+        if self._session is None:
+            raise RuntimeError("CatGenieAuth must be used as an async context manager")
+        headers = self._build_headers(path, method, body, params, require_hmac)
+        if token:
+            headers["authorization"] = f"Bearer {token}"
+        data = (
+            json.dumps(body, separators=(",", ":")).encode()
+            if method.upper() in ("POST", "PUT", "PATCH") and body is not None
+            else None
+        )
+        return await self._session.request(
+            method,
+            self._url(path),
+            headers=headers,
+            data=data,
+            params=params,
+            impersonate=TLS_IMPERSONATE,
+        )
+
+    # ── Public API ──────────────────────────────────────────────────
+
+    async def get_base_url(self, country_code: int, phone: str) -> dict[str, Any]:
+        """GET config/v1/url — preflight call the app makes before login.
+
+        We mirror this to keep the on-wire flow identical to the real app.
+        """
+        resp = await self._request(
+            "GET",
+            ENDPOINT_CONFIG_URL,
+            params={"countryCode": f"+{country_code}", "phone": phone},
+            require_hmac=False,
+        )
+        resp.raise_for_status()
+        return cast(dict[str, Any], resp.json())
+
+    async def request_login_code(self, country_code: int, phone: str) -> dict[str, Any]:
+        """POST generateLoginCode/v2 — triggers SMS verification code.
+
+        Body: {"str1": "<AES-encrypted phone>"}
+        Server returns 200/empty whether or not it dispatches an SMS.
+        """
+        body = {"str1": encrypt_str1(country_code, phone)}
+        resp = await self._request(
+            "POST",
+            ENDPOINT_GENERATE_LOGIN_CODE,
+            body=body,
+            require_hmac=False,
+        )
+        return {"status": resp.status_code, "data": {}}
+
+    async def login(
+        self,
+        country_code: int,
+        phone: str,
+        code: str,
+    ) -> Credentials:
+        """POST loginByPhoneNumber/v2 — exchange SMS code for tokens."""
+        body = {"str1": encrypt_str1(country_code, phone), "code": code}
+        resp = await self._request("POST", ENDPOINT_LOGIN_BY_PHONE, body=body)
+        if resp.status_code != 200 or not resp.content:
+            raise AuthenticationError(
+                f"Login failed (status={resp.status_code}, body={resp.content!r}). "
+                "SMS code is likely expired or already consumed; request a new one."
+            )
+        data = resp.json()
+        self.credentials = Credentials(
+            access_token=data.get("accessToken", ""),
+            refresh_token=data.get("refreshToken", ""),
+            secret=self._secret,
+            token_expiration=_parse_expiration(data.get("expiration", 0)),
+            account_id=data.get("accountId", ""),
+            user_id=data.get("userId", ""),
+            tenant_id=data.get("tenantId", ""),
+        )
+        return self.credentials
+
+    async def refresh(self) -> Credentials:
+        """POST refreshToken/v2 — get a fresh JWT using the refresh token."""
+        if not self.credentials.refresh_token:
+            raise AuthenticationError("No refresh token available")
+        body = {"refreshToken": self.credentials.refresh_token}
+        resp = await self._request("POST", ENDPOINT_REFRESH_TOKEN, body=body)
+        if resp.status_code == 401:
+            raise AuthenticationError(f"Refresh token rejected: {resp.text}")
+        resp.raise_for_status()
+        data = resp.json()
+        self.credentials.access_token = data.get("token", "")
+        self.credentials.token_expiration = _parse_expiration(data.get("expiration", 0))
+        return self.credentials
+
+
+def _parse_expiration(value: int | float | str) -> float:
+    """Parse expiration — API returns milliseconds since epoch."""
+    try:
+        ms = int(value)
+        return ms / 1000.0 if ms > 1_000_000_000_000 else float(ms)
+    except (ValueError, TypeError):
+        return 0.0
