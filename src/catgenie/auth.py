@@ -60,6 +60,7 @@ class Credentials:
 
     @property
     def is_token_expired(self) -> bool:
+        """Return True if the access token is absent or has expired."""
         return not self.access_token or time.time() >= self.token_expiration
 
 
@@ -83,6 +84,7 @@ class CatGenieAuth:
         base_url: str = BASE_URL,
         secret: str = "",
     ) -> None:
+        """Initialise the auth client."""
         self._session: AsyncSession[Response] | None = session
         self._owns_session = session is None
         self._base_url = base_url.rstrip("/")
@@ -90,6 +92,7 @@ class CatGenieAuth:
         self.credentials = Credentials(secret=secret)
 
     async def __aenter__(self) -> CatGenieAuth:
+        """Enter the async context manager, creating a session if needed."""
         if self._session is None:
             self._session = AsyncSession(impersonate=TLS_IMPERSONATE)
         return self
@@ -100,6 +103,7 @@ class CatGenieAuth:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        """Exit the async context manager, closing the session if owned."""
         if self._owns_session and self._session is not None:
             await self._session.close()
             self._session = None

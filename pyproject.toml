@@ -44,8 +44,20 @@ dev = [
     "pre-commit>=3.0",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
     "ruff>=0.4",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src/catgenie"]
+omit = ["*/scripts/*"]
+
+[tool.coverage.report]
+show_missing = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/catgenie"]

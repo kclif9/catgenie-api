@@ -41,22 +41,30 @@ _lenient = ConfigDict(populate_by_name=True, extra="allow")
 
 
 class DeviceStatus(IntEnum):
+    """Connectivity status reported by the device shadow."""
+
     UNKNOWN = 0
     IDLE = 1
     CONNECTED = 2
 
 
 class OperationState(IntEnum):
+    """Current cleaning-cycle operation state."""
+
     IDLE = 0
     RUNNING = 1
 
 
 class CleaningMode(IntEnum):
+    """Cleaning trigger mode: automatic (cat-sensor) or manual."""
+
     AUTOMATIC = 0
     MANUAL = 1
 
 
 class NotificationServiceType(IntEnum):
+    """Push notification delivery service."""
+
     FCM_ANDROID = 0
     APNS_IOS = 1
 
@@ -67,6 +75,8 @@ class NotificationServiceType(IntEnum):
 
 
 class ActivationInfo(BaseModel):
+    """Device activation record including lifetime cycle count."""
+
     model_config = _lenient
 
     date: datetime = Field(alias="date")
@@ -76,6 +86,8 @@ class ActivationInfo(BaseModel):
 
 
 class HeaterConfig(BaseModel):
+    """Heater hardware configuration."""
+
     model_config = _lenient
 
     model: int = Field(alias="model")
@@ -83,6 +95,8 @@ class HeaterConfig(BaseModel):
 
 
 class WaterConfig(BaseModel):
+    """Water sensor and fill level configuration."""
+
     model_config = _lenient
 
     fill_max: int = Field(alias="fillMax")
@@ -92,6 +106,8 @@ class WaterConfig(BaseModel):
 
 
 class BinaryElements(BaseModel):
+    """Binary feature flags for extra wash and shake cycles."""
+
     model_config = _lenient
 
     extra_wash: bool = Field(False, alias="EXTRA_WASH")
@@ -138,6 +154,8 @@ class DeviceConfiguration(BaseModel):
 
 
 class OperationStatus(BaseModel):
+    """Real-time cleaning operation state and progress."""
+
     model_config = _strict
 
     # 0 = idle, 1 = running
@@ -147,6 +165,7 @@ class OperationStatus(BaseModel):
 
     @property
     def is_cleaning(self) -> bool:
+        """Return True while a cleaning cycle is in progress."""
         return self.state == OperationState.RUNNING
 
     @property
@@ -156,6 +175,8 @@ class OperationStatus(BaseModel):
 
 
 class UpdateGroup(BaseModel):
+    """Firmware update rollout group assignment."""
+
     model_config = _lenient
 
     id: str = Field(alias="id")
@@ -215,10 +236,12 @@ class Device(BaseModel):
 
     @property
     def is_online(self) -> bool:
+        """Return True when the device reports as connected."""
         return self.reported_status.lower() == "connected"
 
     @property
     def is_cleaning(self) -> bool:
+        """Return True while a cleaning cycle is in progress."""
         return self.operation_status.is_cleaning
 
     @property
@@ -247,6 +270,8 @@ class NotificationData(BaseModel):
 
 
 class Notification(BaseModel):
+    """A single push notification from the PetNovations backend."""
+
     model_config = _lenient
 
     id: str = Field(alias="id")
@@ -266,6 +291,8 @@ class Notification(BaseModel):
 
 
 class NotificationList(BaseModel):
+    """Paginated list of notifications for a user."""
+
     model_config = _lenient
 
     user_id: str = Field(alias="userId")
@@ -302,6 +329,7 @@ class LoginResponse(BaseModel):
 
     @property
     def full_name(self) -> str:
+        """Return first and last name joined and stripped."""
         return f"{self.first_name} {self.last_name}".strip()
 
 
@@ -322,6 +350,7 @@ class RefreshResponse(BaseModel):
 
     @property
     def expiration_ms(self) -> int:
+        """Return the token expiration as a millisecond Unix timestamp."""
         return int(self.expiration)
 
 
