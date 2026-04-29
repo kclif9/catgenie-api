@@ -1,5 +1,4 @@
-"""
-Request signing for the CatGenie API.
+"""Request signing for the CatGenie API.
 
 Every request to iot.petnovations.com requires 4 signature headers derived from:
 - An 84-character per-account secret (stored after login)

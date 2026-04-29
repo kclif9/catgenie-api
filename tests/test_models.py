@@ -8,7 +8,6 @@ import pytest
 from pydantic import ValidationError
 
 from catgenie.models import (
-    ActivationInfo,
     APIError,
     BinaryElements,
     CleaningMode,
@@ -18,14 +17,12 @@ from catgenie.models import (
     HeaterConfig,
     LoginResponse,
     Notification,
-    NotificationData,
     NotificationList,
     NotificationServiceType,
     OperationState,
     OperationStatus,
     RefreshResponse,
     ScheduleEntry,
-    UpdateGroup,
     WaterConfig,
 )
 from tests.conftest import FULL_DEVICE_PAYLOAD, NOTIFICATION_PAYLOAD
@@ -101,9 +98,7 @@ class TestDeviceConfiguration:
         assert cfg is not None
 
     def test_binary_elements_aliases(self) -> None:
-        be = BinaryElements.model_validate(
-            {"EXTRA_WASH": True, "EXTRA_SHAKE": False}
-        )
+        be = BinaryElements.model_validate({"EXTRA_WASH": True, "EXTRA_SHAKE": False})
         assert be.extra_wash is True
         assert be.extra_shake is False
 
@@ -152,7 +147,10 @@ class TestDevice:
         assert device.is_cleaning is False
 
     def test_is_cleaning_true_when_running(self) -> None:
-        payload = {**FULL_DEVICE_PAYLOAD, "operationStatus": {"state": 1, "progress": 50}}
+        payload = {
+            **FULL_DEVICE_PAYLOAD,
+            "operationStatus": {"state": 1, "progress": 50},
+        }
         device = Device.model_validate(payload)
         assert device.is_cleaning is True
 
@@ -234,9 +232,7 @@ class TestNotificationModels:
         assert n.parsed_data is None
 
     def test_empty_notification_list(self) -> None:
-        nl = NotificationList.model_validate(
-            {"userId": "abc", "notifications": []}
-        )
+        nl = NotificationList.model_validate({"userId": "abc", "notifications": []})
         assert nl.notifications == []
 
 

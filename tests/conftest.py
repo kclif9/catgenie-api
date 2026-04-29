@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 FULL_DEVICE_PAYLOAD: dict = {
     "manufacturerId": "CGR1234567",

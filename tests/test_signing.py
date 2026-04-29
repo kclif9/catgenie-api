@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import re
 
-import pytest
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
@@ -171,23 +170,17 @@ class TestGenerateRequestHeaders:
         assert "y-pm-sg-p" not in headers
 
     def test_hmac_headers_present_with_secret(self) -> None:
-        headers = generate_request_headers(
-            "device/device/v2", secret="A" * 84
-        )
+        headers = generate_request_headers("device/device/v2", secret="A" * 84)
         assert "y-pm-sg-b" in headers
         assert "y-pm-sg-p" in headers
 
     def test_hmac_values_are_hex_strings(self) -> None:
-        headers = generate_request_headers(
-            "device/device/v2", secret="A" * 84
-        )
+        headers = generate_request_headers("device/device/v2", secret="A" * 84)
         assert re.match(r"^[0-9a-f]{64}$", headers["y-pm-sg-b"])
         assert re.match(r"^[0-9a-f]{64}$", headers["y-pm-sg-p"])
 
     def test_facade_path_stripped_in_render_t(self) -> None:
-        headers = generate_request_headers(
-            "facade/v1/mobile-user/refreshToken/v2"
-        )
+        headers = generate_request_headers("facade/v1/mobile-user/refreshToken/v2")
         assert headers["x-render-t"].startswith("mobile-user/refreshToken/v2/")
 
     def test_post_body_included_in_hmac(self) -> None:

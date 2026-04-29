@@ -47,6 +47,7 @@ class CatGenieClient:
         session: AsyncSession[Response] | None = None,
         base_url: str = BASE_URL,
     ) -> None:
+        """Initialise the API client."""
         self._session: AsyncSession[Response] | None = session
         self._owns_session = session is None
         self._credentials = credentials
@@ -54,6 +55,7 @@ class CatGenieClient:
         self._auth: CatGenieAuth | None = None
 
     async def __aenter__(self) -> CatGenieClient:
+        """Enter the async context manager, creating a session if needed."""
         if self._session is None:
             self._session = AsyncSession(impersonate=TLS_IMPERSONATE)
         return self
@@ -64,6 +66,7 @@ class CatGenieClient:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        """Exit the async context manager, closing the session if owned."""
         if self._owns_session and self._session is not None:
             await self._session.close()
             self._session = None
@@ -150,14 +153,17 @@ class CatGenieClient:
         return [Device.model_validate(d) for d in data.get("thingList", [])]
 
     async def get_device_status(self, device_id: str) -> dict[str, Any]:
+        """Get the current status shadow for a device."""
         path = ENDPOINT_DEVICE_STATUS.format(device_id=device_id)
         return await self._request("GET", path)
 
     async def start_cleaning(self, device_id: str) -> dict[str, Any]:
+        """Start a manual cleaning cycle on the given device."""
         path = ENDPOINT_DEVICE_OPERATION.format(device_id=device_id)
         return await self._request("POST", path, body={"state": 1})
 
     async def stop_cleaning(self, device_id: str) -> dict[str, Any]:
+        """Stop an active cleaning cycle on the given device."""
         path = ENDPOINT_DEVICE_OPERATION.format(device_id=device_id)
         return await self._request("POST", path, body={"state": 0})
 
@@ -168,31 +174,38 @@ class CatGenieClient:
         return await self._request("GET", ENDPOINT_USER)
 
     async def get_pets(self) -> list[dict[str, Any]]:
+        """Get all pets associated with the account."""
         return await self._request("GET", ENDPOINT_PETS)
 
     async def get_pet_statistics(self) -> dict[str, Any]:
+        """Get usage statistics aggregated per pet."""
         return await self._request("GET", ENDPOINT_PET_STATS)
 
     # ── Notifications ────────────────────────────────────────────────
 
     async def get_notifications(self) -> NotificationList:
+        """Get the notification history for the account."""
         data = await self._request("GET", ENDPOINT_NOTIFICATIONS)
         return NotificationList.model_validate(data)
 
     async def get_notification_settings(self) -> dict[str, Any]:
+        """Get push notification preferences for the account."""
         return await self._request("GET", ENDPOINT_NOTIFICATION_SETTINGS)
 
     # ── Firmware ─────────────────────────────────────────────────────
 
     async def get_firmware_info(self, manufacturer_id: str) -> dict[str, Any]:
+        """Get available firmware update info for a device."""
         path = ENDPOINT_FIRMWARE_UPDATE.format(manufacturer_id=manufacturer_id)
         return await self._request("GET", path)
 
     async def get_firmware_comments(self, version: str) -> dict[str, Any]:
+        """Get release notes for a specific firmware version."""
         return await self._request(
             "GET", ENDPOINT_FIRMWARE_COMMENTS, params={"name": version}
         )
 
     async def get_mainboard(self, manufacturer_id: str) -> dict[str, Any]:
+        """Get mainboard hardware details for a device."""
         path = ENDPOINT_MAINBOARD.format(manufacturer_id=manufacturer_id)
         return await self._request("GET", path)
