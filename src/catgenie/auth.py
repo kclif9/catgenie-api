@@ -158,6 +158,7 @@ class CatGenieAuth:
             data=data,
             params=params,
             impersonate=TLS_IMPERSONATE,
+            default_headers=False,
         )
 
     # ── Public API ──────────────────────────────────────────────────
@@ -180,7 +181,13 @@ class CatGenieAuth:
         """POST generateLoginCode/v2 — triggers SMS verification code.
 
         Body: {"str1": "<AES-encrypted phone>"}
-        Server returns 200/empty whether or not it dispatches an SMS.
+
+        The server always returns 200 regardless of success or failure.
+        A missing SMS typically indicates the str1 payload was rejected
+        (the server silently discards malformed requests).
+
+        Returns:
+            Dict with ``status`` key (HTTP status code).
         """
         body = {"str1": encrypt_str1(country_code, phone)}
         resp = await self._request(

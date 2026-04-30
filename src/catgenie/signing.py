@@ -15,7 +15,6 @@ import base64
 import hashlib
 import hmac
 import random
-import string
 import time
 from typing import Any
 
@@ -76,7 +75,8 @@ def _hmac_sha256(key: str, message: str) -> str:
 
 
 def _random_string(length: int) -> str:
-    chars = string.ascii_letters + string.digits
+    # App charset: digits + uppercase (with T duplicated, Y missing) + lowercase (j missing)
+    chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz"
     return "".join(random.choice(chars) for _ in range(length))  # noqa: S311
 
 
@@ -88,10 +88,10 @@ def _insert_char(s: str, char: str) -> str:
 def encrypt_str1(country_code: int, phone: str) -> str:
     """Encrypt phone number for the str1 body field.
 
-    Format: +{countryCode}{phone}-{8_random_chars}
+    Format: +{countryCode}{phone}-{7_random_chars_with_X_inserted}
     Encrypted with AES-CBC, static key, zero IV.
     """
-    random_suffix = _random_string(8)
+    random_suffix = _insert_char(_random_string(7), "X")
     plaintext = f"+{country_code}{phone}-{random_suffix}"
     cipher = AES.new(AES_KEY, AES.MODE_CBC, iv=b"\x00" * 16)
     encrypted = cipher.encrypt(pad(plaintext.encode("utf-8"), AES.block_size))
@@ -158,8 +158,7 @@ def generate_request_headers(
         "x-render-t": render_t,
     }
 
-    # HMAC signatures are only added when a signing secret is available.
-    # Pre-auth endpoints (config, generateLoginCode) don't require them.
+    # HMAC signatures — computed when a signing secret is available.
     if secret:
         hmac_key = derive_hmac_key(secret, environment)
 

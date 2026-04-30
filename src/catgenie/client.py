@@ -126,6 +126,7 @@ class CatGenieClient:
             data=data,
             params=params,
             impersonate=TLS_IMPERSONATE,
+            default_headers=False,
         )
         if resp.status_code == 401 and self._auth:
             await self._auth.refresh()
@@ -137,6 +138,7 @@ class CatGenieClient:
                 data=data,
                 params=params,
                 impersonate=TLS_IMPERSONATE,
+                default_headers=False,
             )
         resp.raise_for_status()
         return resp.json() if resp.content else {}
