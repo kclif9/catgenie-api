@@ -2,6 +2,7 @@
 
 from .auth import CatGenieAuth, Credentials
 from .client import CatGenieClient
+from .exceptions import CatGenieAuthenticationError, CatGenieAPIError, CatGenieException
 from .models import (
     ActivationInfo,
     APIError,
@@ -30,6 +31,10 @@ __all__ = [
     "CatGenieAuth",
     "CatGenieClient",
     "Credentials",
+    # Exceptions
+    "CatGenieAuthenticationError",
+    "CatGenieAPIError",
+    "CatGenieException",
     # Device models
     "ActivationInfo",
     "BinaryElements",

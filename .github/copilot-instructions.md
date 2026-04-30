@@ -1,30 +1,36 @@
 # GitHub Copilot Instructions for CatGenie API
 
 ## Project Overview
+
 The CatGenie API is a reverse-engineered Python library for interacting with the CatGenie AI smart litter box by PetNovations. It provides authentication (phone number + SMS OTP), device status, and control (start/stop cleaning cycles). The library targets Home Assistant integration and is designed for platinum-level quality from day one.
 
 ## Critical Infrastructure Knowledge
 
 ### TLS Fingerprinting
+
 **The single most important non-obvious fact about this API:**
 PetNovations' CloudFront edge silently returns `200 OK / Content-Length: 0` for any request whose TLS JA3 fingerprint doesn't match a mobile/browser client. Python stdlib SSL (urllib, http.client, requests, aiohttp) is **silently filtered** — the server returns an empty 200 but never sends the SMS and never returns data.
 
 **Solution**: All HTTP must use `curl_cffi` with `impersonate="chrome131_android"` (`TLS_IMPERSONATE` constant). This is non-negotiable. Never replace `curl_cffi` with any other HTTP library.
 
 ### Authentication Flow
+
 1. `GET config/v1/url` — preflight (mirrors real app behaviour)
 2. `POST ums/v1/users/generateLoginCode/v2` — triggers SMS; body: `{"str1": "<AES-encrypted phone>"}`
 3. `POST ums/v1/users/loginByPhoneNumber/v2` — exchanges phone + code for JWT + refresh token
 4. `POST facade/v1/mobile-user/refreshToken/v2` — refresh; access token ~30 min, refresh token ~10 years
 
 ### Request Headers
+
 Every request requires:
+
 - `x-pm-en-dec`: AES-CBC(timestamp, static_key, zero_iv) — implemented in `signing.py`
 - `x-pm-en-ver`: `"1.0.0"`
 - `x-render-t`: `"{path}/{timestamp_ms}"` — `facade/v1/` prefix is stripped
 - `y-pm-sg-b` / `y-pm-sg-p`: HMAC-SHA256 body/params signatures (only when 84-char secret is available; server does **not** validate these)
 
 ### Phone Encryption
+
 `str1` = AES-CBC(`"+{countryCode}{phone}-{8_random_chars}"`, key=`P-3Rp6d81Kw9a3Z-CyvWH0WXRieyITk6`, iv=zero) — see `signing.encrypt_str1()`.
 
 ---
@@ -32,18 +38,22 @@ Every request requires:
 ## Core Development Principles
 
 ### 1. Code Quality Standards
+
 - **Type Safety**: Full type hints everywhere. Package ships `py.typed` (PEP 561). mypy must pass with zero errors.
 - **Error Handling**: Fail-fast for critical operations, graceful degradation for non-critical
 - **Documentation**: All public APIs must have Google-style docstrings
 - **Testing**: Write tests for new features and bug fixes
 
 ### 2. Pre-commit Compliance
+
 **CRITICAL**: All code must pass pre-commit checks before committing. Run:
+
 ```bash
 pre-commit run --all-files
 ```
 
 Our pre-commit pipeline includes:
+
 - **ruff**: Linting and auto-formatting (E, F, W, I rules)
 - **mypy**: Type checking (config in `pyproject.toml` `[tool.mypy]`)
 - **pydocstyle**: Google convention docstrings
@@ -52,24 +62,27 @@ Our pre-commit pipeline includes:
 ### 3. Exception Handling Philosophy
 
 **Fail Fast (raise exceptions):**
-- Authentication failures (`AuthenticationError`)
+
+- Authentication failures (`CatGenieAuthenticationError`)
 - API communication errors (non-200 responses)
 - Control command failures (start/stop cleaning)
 - Missing required configuration
 - Invalid API responses that break core functionality
 
 **Graceful Degradation (log and continue):**
+
 - Missing optional device fields (use Pydantic defaults)
 - Firmware-version-dependent configuration fields (use `extra="allow"` on lenient models)
 - Non-critical nested component parsing
 
 **Example Pattern:**
+
 ```python
 # Critical — fail fast
 async def login(self, country_code: int, phone: str, code: str) -> Credentials:
     resp = await self._request("POST", ENDPOINT_LOGIN_BY_PHONE, body=body)
     if resp.status_code != 200 or not resp.content:
-        raise AuthenticationError(
+        raise CatGenieAuthenticationError(
             f"Login failed (status={resp.status_code}). "
             "SMS code is likely expired or already consumed."
         )
@@ -85,6 +98,7 @@ class DeviceConfiguration(BaseModel):
 ### 4. Code Architecture
 
 **Project Structure:**
+
 ```
 src/catgenie/
 ├── __init__.py     # Public API exports
@@ -97,6 +111,7 @@ src/catgenie/
 ```
 
 **Design Patterns:**
+
 - **Pydantic v2 Models**: All API responses parsed into typed models. Never return raw dicts from public methods.
 - **Two model configs**: `_strict` (`extra="forbid"`) for outer/core models, `_lenient` (`extra="allow"`) for firmware-dependent nested config.
 - **Type Safety**: Full type hints, `py.typed` marker, mypy zero-error.
@@ -106,6 +121,7 @@ src/catgenie/
 ### 5. Common Patterns and Best Practices
 
 #### Pydantic Models (v2 style)
+
 ```python
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -126,6 +142,7 @@ class Device(BaseModel):
 ```
 
 #### HTTP Requests (curl_cffi — always impersonate)
+
 ```python
 from curl_cffi.requests import AsyncSession, Response
 from .const import TLS_IMPERSONATE
@@ -141,6 +158,7 @@ resp = await self._session.request(
 ```
 
 #### Logging
+
 ```python
 import logging
 
@@ -153,6 +171,7 @@ _LOGGER.error("Failures requiring attention", exc_info=True)
 ```
 
 #### Async Context Manager Pattern
+
 ```python
 from types import TracebackType
 
@@ -175,14 +194,16 @@ async def __aexit__(
 ### 6. Testing Requirements
 
 When adding new features:
+
 1. Write unit tests in `tests/`
 2. Test both success and failure paths
 3. Mock curl_cffi `AsyncSession` — do NOT use real HTTP in unit tests
-4. Verify `AuthenticationError` is raised on empty-body 200 responses (the TLS-filtered response shape)
+4. Verify `CatGenieAuthenticationError` is raised on empty-body 200 responses (the TLS-filtered response shape)
 
 ### 7. Documentation Standards
 
 **Module Docstrings:**
+
 ```python
 """Brief module description.
 
@@ -192,6 +213,7 @@ and how it fits into the overall architecture.
 ```
 
 **Function/Method Docstrings:**
+
 ```python
 async def get_devices(self) -> list[Device]:
     """Get all devices associated with the account.
@@ -200,7 +222,7 @@ async def get_devices(self) -> list[Device]:
         List of Device models.
 
     Raises:
-        AuthenticationError: If the access token is invalid and refresh fails.
+        CatGenieAuthenticationError: If the access token is invalid and refresh fails.
         HTTPError: If the API returns a non-2xx response.
     """
 ```
@@ -208,6 +230,7 @@ async def get_devices(self) -> list[Device]:
 ### 8. Common Gotchas and Anti-Patterns
 
 **❌ DON'T:**
+
 - Replace `curl_cffi` with `aiohttp`, `httpx`, `requests`, or urllib — TLS fingerprinting will break
 - Use bare `AsyncSession` without `[Response]` type argument — violates `disallow_any_generics`
 - Pass `method` as a plain `str` to `session.request()` — use `_HttpMethod = Literal["GET", "POST", ...]`
@@ -219,6 +242,7 @@ async def get_devices(self) -> list[Device]:
 - Commit code that fails pre-commit checks
 
 **✅ DO:**
+
 - Always pass `impersonate=TLS_IMPERSONATE` on every curl_cffi request
 - Use `cast(dict[str, Any], resp.json())` when curl_cffi's untyped `json()` is called and you need a typed return
 - Annotate `AsyncSession` as `AsyncSession[Response]`
@@ -238,6 +262,7 @@ async def get_devices(self) -> list[Device]:
 ### 10. API Client Best Practices
 
 **Session Injection (for HA integration):**
+
 ```python
 # HA integration can inject a shared session:
 async with CatGenieAuth(session=shared_session) as auth:
@@ -248,11 +273,13 @@ async with CatGenieClient(creds, session=shared_session) as client:
 ```
 
 **Token Management:**
+
 - Access tokens expire in ~30 minutes; refresh tokens are ~10 years
 - `CatGenieClient._request()` auto-refreshes on 401 if a `CatGenieAuth` is attached via `set_auth()`
 - `Credentials.is_token_expired` checks expiry before each request
 
 **Model Validation at API Boundaries:**
+
 - `get_devices()` returns `list[Device]` — validated via `Device.model_validate(d)`
 - `get_notifications()` returns `NotificationList` — validated via `NotificationList.model_validate(data)`
 - All other endpoints return `dict[str, Any]` until models are added — add models as needed
@@ -260,6 +287,7 @@ async with CatGenieClient(creds, session=shared_session) as client:
 ### 11. Making Changes Checklist
 
 Before proposing any code changes:
+
 1. ✅ Understand the TLS fingerprinting requirement — never change the HTTP client
 2. ✅ Understand the fail-fast vs graceful degradation philosophy
 3. ✅ Check if similar patterns exist in the codebase
@@ -283,7 +311,9 @@ Before proposing any code changes:
 ## Development Workflow
 
 ### Virtual Environment
+
 **CRITICAL**: This project uses `uv`. Always use the venv directly:
+
 ```bash
 # Run commands via venv (preferred)
 .venv/bin/python ...
@@ -294,7 +324,9 @@ source .venv/bin/activate
 ```
 
 ### Before Completing Any Work
+
 **MANDATORY**: Before considering any work complete, you MUST:
+
 1. ✅ Run the full test suite with coverage (`.venv/bin/pytest --cov=src --cov-report=term-missing`)
 2. ✅ Verify test coverage has not regressed
 3. ✅ Run all pre-commit checks (`pre-commit run --all-files`)
@@ -338,6 +370,7 @@ pre-commit install
 ## When Working on This Project
 
 **Always consider:**
+
 1. Will this change break the TLS fingerprint requirement? (Never swap curl_cffi)
 2. Will this break existing HA integrations?
 3. Does this follow the project's exception handling philosophy?
@@ -345,6 +378,7 @@ pre-commit install
 5. Is the code type-safe, well-documented, and using the correct model config (`_strict` vs `_lenient`)?
 
 **Completion Checklist (MANDATORY):**
+
 1. ✅ All tests pass (`.venv/bin/pytest` returns 0 exit code)
 2. ✅ Test coverage verified and not regressed
 3. ✅ All pre-commit checks pass
