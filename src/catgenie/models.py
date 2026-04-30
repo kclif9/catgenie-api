@@ -16,15 +16,26 @@ errors immediately rather than surfacing as silent KeyErrors at runtime.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import IntEnum
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
 )
+
+
+def _ensure_utc(dt: datetime) -> datetime:
+    """Attach UTC if the datetime is naive, otherwise convert to UTC."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+UtcDatetime = Annotated[datetime, AfterValidator(_ensure_utc)]
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +90,7 @@ class ActivationInfo(BaseModel):
 
     model_config = _lenient
 
-    date: datetime = Field(alias="date")
+    date: UtcDatetime = Field(alias="date")
     state: int = Field(alias="state")
     # Total lifetime cleaning cycles — the most useful counter for HA.
     count: int = Field(alias="count")
@@ -210,7 +221,7 @@ class Device(BaseModel):
     connection_mode: str = Field("", alias="connectionMode")
 
     # State
-    last_clean: datetime | None = Field(None, alias="lastClean")
+    last_clean: UtcDatetime | None = Field(None, alias="lastClean")
     remaining_sani_solution: int = Field(0, alias="remainingSaniSolution")
     service_level: str = Field("", alias="serviceLevel")
     country_code: int = Field(0, alias="countryCode")
@@ -275,7 +286,7 @@ class Notification(BaseModel):
     model_config = _lenient
 
     id: str = Field(alias="id")
-    creation_time: datetime = Field(alias="creationTime")
+    creation_time: UtcDatetime = Field(alias="creationTime")
     # Raw JSON string — parsed on demand via .parsed_data
     data: str = Field("", alias="data")
 
