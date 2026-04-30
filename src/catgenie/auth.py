@@ -39,6 +39,7 @@ from .const import (
     ENDPOINT_REFRESH_TOKEN,
     TLS_IMPERSONATE,
 )
+from .exceptions import CatGenieAuthenticationError, CatGenieAPIError
 from .signing import encrypt_str1, generate_request_headers
 
 _HttpMethod = Literal[
@@ -62,10 +63,6 @@ class Credentials:
     def is_token_expired(self) -> bool:
         """Return True if the access token is absent or has expired."""
         return not self.access_token or time.time() >= self.token_expiration
-
-
-class AuthenticationError(Exception):
-    """Raised when authentication fails."""
 
 
 class CatGenieAuth:
@@ -174,7 +171,10 @@ class CatGenieAuth:
             params={"countryCode": f"+{country_code}", "phone": phone},
             require_hmac=False,
         )
-        resp.raise_for_status()
+        if resp.status_code < 200 or resp.status_code >= 300:
+            raise CatGenieAPIError(
+                f"Config URL request failed (status={resp.status_code})"
+            )
         return cast(dict[str, Any], resp.json())
 
     async def request_login_code(self, country_code: int, phone: str) -> dict[str, Any]:
@@ -208,7 +208,7 @@ class CatGenieAuth:
         body = {"str1": encrypt_str1(country_code, phone), "code": code}
         resp = await self._request("POST", ENDPOINT_LOGIN_BY_PHONE, body=body)
         if resp.status_code != 200 or not resp.content:
-            raise AuthenticationError(
+            raise CatGenieAuthenticationError(
                 f"Login failed (status={resp.status_code}, body={resp.content!r}). "
                 "SMS code is likely expired or already consumed; request a new one."
             )
@@ -227,12 +227,13 @@ class CatGenieAuth:
     async def refresh(self) -> Credentials:
         """POST refreshToken/v2 — get a fresh JWT using the refresh token."""
         if not self.credentials.refresh_token:
-            raise AuthenticationError("No refresh token available")
+            raise CatGenieAuthenticationError("No refresh token available")
         body = {"refreshToken": self.credentials.refresh_token}
         resp = await self._request("POST", ENDPOINT_REFRESH_TOKEN, body=body)
         if resp.status_code == 401:
-            raise AuthenticationError(f"Refresh token rejected: {resp.text}")
-        resp.raise_for_status()
+            raise CatGenieAuthenticationError(f"Refresh token rejected: {resp.text}")
+        if resp.status_code < 200 or resp.status_code >= 300:
+            raise CatGenieAPIError(f"Token refresh failed (status={resp.status_code})")
         data = resp.json()
         self.credentials.access_token = data.get("token", "")
         self.credentials.token_expiration = _parse_expiration(data.get("expiration", 0))

@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from catgenie.auth import AuthenticationError, Credentials
+from catgenie.auth import CatGenieAuthenticationError, Credentials
+from catgenie.exceptions import CatGenieException
 
 
 class TestCredentials:
@@ -56,8 +57,9 @@ class TestCredentials:
 
 class TestAuthenticationError:
     def test_is_exception(self) -> None:
-        err = AuthenticationError("bad code")
+        err = CatGenieAuthenticationError("bad code")
         assert isinstance(err, Exception)
+        assert isinstance(err, CatGenieException)
         assert str(err) == "bad code"
 
 
@@ -176,7 +178,7 @@ class TestCatGenieAuth:
             mock_session_cls.return_value = mock_session
 
             async with CatGenieAuth() as auth:
-                with pytest.raises(AuthenticationError, match="Login failed"):
+                with pytest.raises(CatGenieAuthenticationError, match="Login failed"):
                     await auth.login(61, "499999999", "000000")
 
     @pytest.mark.asyncio
@@ -191,7 +193,7 @@ class TestCatGenieAuth:
             mock_session_cls.return_value = mock_session
 
             async with CatGenieAuth() as auth:
-                with pytest.raises(AuthenticationError):
+                with pytest.raises(CatGenieAuthenticationError):
                     await auth.login(61, "499999999", "000000")
 
     @pytest.mark.asyncio
@@ -225,7 +227,9 @@ class TestCatGenieAuth:
             mock_session_cls.return_value = mock_session
 
             async with CatGenieAuth() as auth:
-                with pytest.raises(AuthenticationError, match="No refresh token"):
+                with pytest.raises(
+                    CatGenieAuthenticationError, match="No refresh token"
+                ):
                     await auth.refresh()
 
     @pytest.mark.asyncio

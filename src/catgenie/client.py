@@ -25,6 +25,7 @@ from .const import (
     ENDPOINT_USER,
     TLS_IMPERSONATE,
 )
+from .exceptions import CatGenieAPIError
 from .models import Device, NotificationList
 from .signing import generate_request_headers
 
@@ -140,7 +141,10 @@ class CatGenieClient:
                 impersonate=TLS_IMPERSONATE,
                 default_headers=False,
             )
-        resp.raise_for_status()
+        if resp.status_code < 200 or resp.status_code >= 300:
+            raise CatGenieAPIError(
+                f"API request failed: {method} {path} " f"(status={resp.status_code})"
+            )
         return resp.json() if resp.content else {}
 
     # ── Devices ──────────────────────────────────────────────────────
