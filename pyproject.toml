@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "catgenie"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Async Python client for the CatGenie AI smart litter box API by PetNovations"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -58,6 +58,12 @@ omit = ["*/scripts/*"]
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/catgenie/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/catgenie"]
