@@ -15,7 +15,6 @@ import base64
 import hashlib
 import hmac
 import random
-import string
 import time
 from typing import Any
 
@@ -76,7 +75,8 @@ def _hmac_sha256(key: str, message: str) -> str:
 
 
 def _random_string(length: int) -> str:
-    chars = string.ascii_letters + string.digits
+    # App charset: digits + uppercase (with T duplicated, Y missing) + lowercase (j missing)
+    chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz"
     return "".join(random.choice(chars) for _ in range(length))  # noqa: S311
 
 
@@ -88,10 +88,10 @@ def _insert_char(s: str, char: str) -> str:
 def encrypt_str1(country_code: int, phone: str) -> str:
     """Encrypt phone number for the str1 body field.
 
-    Format: +{countryCode}{phone}-{8_random_chars}
+    Format: +{countryCode}{phone}-{7_random_chars_with_X_inserted}
     Encrypted with AES-CBC, static key, zero IV.
     """
-    random_suffix = _random_string(8)
+    random_suffix = _insert_char(_random_string(7), "X")
     plaintext = f"+{country_code}{phone}-{random_suffix}"
     cipher = AES.new(AES_KEY, AES.MODE_CBC, iv=b"\x00" * 16)
     encrypted = cipher.encrypt(pad(plaintext.encode("utf-8"), AES.block_size))
@@ -137,6 +137,7 @@ def generate_request_headers(
     params: dict[str, Any] | None = None,
     secret: str = "",
     environment: str = "production",
+    include_hmac_placeholder: bool = False,
 ) -> dict[str, str]:
     """Generate all required signature headers for a CatGenie API request.
 
@@ -158,8 +159,10 @@ def generate_request_headers(
         "x-render-t": render_t,
     }
 
-    # HMAC signatures are only added when a signing secret is available.
-    # Pre-auth endpoints (config, generateLoginCode) don't require them.
+    # HMAC signatures — computed when a signing secret is available.
+    # When no secret is present but require_hmac is True (e.g. loginByPhoneNumber),
+    # we still emit the headers with a deterministic placeholder so the WAF sees
+    # the expected header shape.
     if secret:
         hmac_key = derive_hmac_key(secret, environment)
 
@@ -175,5 +178,9 @@ def generate_request_headers(
 
         headers["y-pm-sg-b"] = _hmac_sha256(hmac_key, body_data)
         headers["y-pm-sg-p"] = _hmac_sha256(hmac_key, params_data)
+    elif include_hmac_placeholder:
+        # WAF may check for header presence even without validating values.
+        headers["y-pm-sg-b"] = hashlib.sha256(render_t.encode()).hexdigest()
+        headers["y-pm-sg-p"] = hashlib.sha256(render_t.encode()).hexdigest()
 
     return headers
