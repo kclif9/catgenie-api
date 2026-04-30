@@ -128,7 +128,6 @@ class CatGenieAuth:
                 body=body,
                 params=params,
                 secret=secret,
-                include_hmac_placeholder=require_hmac,
             )
         )
         return headers

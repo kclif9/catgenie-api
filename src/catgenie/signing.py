@@ -137,7 +137,6 @@ def generate_request_headers(
     params: dict[str, Any] | None = None,
     secret: str = "",
     environment: str = "production",
-    include_hmac_placeholder: bool = False,
 ) -> dict[str, str]:
     """Generate all required signature headers for a CatGenie API request.
 
@@ -160,9 +159,6 @@ def generate_request_headers(
     }
 
     # HMAC signatures — computed when a signing secret is available.
-    # When no secret is present but require_hmac is True (e.g. loginByPhoneNumber),
-    # we still emit the headers with a deterministic placeholder so the WAF sees
-    # the expected header shape.
     if secret:
         hmac_key = derive_hmac_key(secret, environment)
 
@@ -178,9 +174,5 @@ def generate_request_headers(
 
         headers["y-pm-sg-b"] = _hmac_sha256(hmac_key, body_data)
         headers["y-pm-sg-p"] = _hmac_sha256(hmac_key, params_data)
-    elif include_hmac_placeholder:
-        # WAF may check for header presence even without validating values.
-        headers["y-pm-sg-b"] = hashlib.sha256(render_t.encode()).hexdigest()
-        headers["y-pm-sg-p"] = hashlib.sha256(render_t.encode()).hexdigest()
 
     return headers
