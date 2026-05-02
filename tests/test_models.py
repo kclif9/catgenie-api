@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import pytest
-from pydantic import ValidationError
 
 from catgenie.models import (
     APIError,
@@ -64,11 +62,81 @@ class TestOperationStatus:
         s = OperationStatus.model_validate({"state": 1, "progress": 0})
         assert s.clean_progress_pct == 0
 
-    def test_extra_fields_forbidden(self) -> None:
-        with pytest.raises(ValidationError):
-            OperationStatus.model_validate(
-                {"state": 0, "progress": 255, "unexpected": True}
-            )
+    def test_extra_fields_allowed(self) -> None:
+        s = OperationStatus.model_validate(
+            {"state": 0, "progress": 255, "unexpected": True}
+        )
+        assert s.state == OperationState.IDLE
+
+    def test_error_field(self) -> None:
+        s = OperationStatus.model_validate(
+            {"state": 1, "progress": 50, "error": "HEATER_FAULT"}
+        )
+        assert s.error == "HEATER_FAULT"
+        assert s.has_error is True
+
+    def test_no_error(self) -> None:
+        s = OperationStatus.model_validate({"state": 0, "progress": 255})
+        assert s.error == ""
+        assert s.has_error is False
+
+    def test_sens_field_detected(self) -> None:
+        s = OperationStatus.model_validate({"state": 0, "progress": 255, "sens": "1"})
+        assert s.sens == "1"
+        assert s.is_cat_detected is True
+
+    def test_sens_field_not_detected(self) -> None:
+        s = OperationStatus.model_validate({"state": 0, "progress": 255})
+        assert s.sens is None
+        assert s.is_cat_detected is False
+
+    def test_sens_empty_string_not_detected(self) -> None:
+        s = OperationStatus.model_validate({"state": 0, "progress": 255, "sens": ""})
+        assert s.is_cat_detected is False
+
+    def test_step_num_field(self) -> None:
+        s = OperationStatus.model_validate({"state": 1, "progress": 30, "stepNum": 5})
+        assert s.step_num == 5
+
+    def test_relay_mode_field(self) -> None:
+        s = OperationStatus.model_validate(
+            {"state": 0, "progress": 255, "relayMode": 2}
+        )
+        assert s.relay_mode == 2
+
+    def test_rtc_field(self) -> None:
+        s = OperationStatus.model_validate(
+            {"state": 0, "progress": 255, "rtc": "2026-01-01T00:00:00"}
+        )
+        assert s.rtc == "2026-01-01T00:00:00"
+
+    def test_mode_and_manual_fields(self) -> None:
+        s = OperationStatus.model_validate(
+            {"state": 1, "progress": 10, "mode": 1, "manual": 1}
+        )
+        assert s.mode == 1
+        assert s.manual == 1
+
+    def test_all_fields_from_api(self) -> None:
+        s = OperationStatus.model_validate(
+            {
+                "state": 1,
+                "progress": 75,
+                "error": "",
+                "sens": "1",
+                "rtc": "2026-05-01T12:00:00",
+                "mode": 0,
+                "manual": 0,
+                "stepNum": 3,
+                "relayMode": 1,
+            }
+        )
+        assert s.is_cleaning is True
+        assert s.clean_progress_pct == 75
+        assert s.has_error is False
+        assert s.is_cat_detected is True
+        assert s.step_num == 3
+        assert s.relay_mode == 1
 
 
 class TestDeviceConfiguration:

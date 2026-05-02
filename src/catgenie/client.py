@@ -12,6 +12,7 @@ from .auth import CatGenieAuth, Credentials
 from .const import (
     BASE_URL,
     DEFAULT_HEADERS,
+    ENDPOINT_DEVICE_CONFIG,
     ENDPOINT_DEVICE_OPERATION,
     ENDPOINT_DEVICE_STATUS,
     ENDPOINT_DEVICES,
@@ -26,7 +27,7 @@ from .const import (
     TLS_IMPERSONATE,
 )
 from .exceptions import CatGenieAPIError
-from .models import Device, NotificationList
+from .models import CleaningMode, Device, NotificationList, ScheduleEntry
 from .signing import generate_request_headers
 
 _HttpMethod = Literal[
@@ -215,3 +216,143 @@ class CatGenieClient:
         """Get mainboard hardware details for a device."""
         path = ENDPOINT_MAINBOARD.format(manufacturer_id=manufacturer_id)
         return await self._request("GET", path)
+
+    # ── Configuration ────────────────────────────────────────────────
+
+    async def update_configuration(
+        self, device_id: str, **kwargs: Any
+    ) -> dict[str, Any]:
+        """Update device configuration with partial field(s).
+
+        Args:
+            device_id: The device manufacturer ID.
+            **kwargs: Configuration fields to update (camelCase API keys).
+
+        Returns:
+            API response dict.
+
+        Raises:
+            CatGenieAPIError: If the API returns a non-2xx response.
+        """
+        path = ENDPOINT_DEVICE_CONFIG.format(device_id=device_id)
+        return await self._request("POST", path, body=kwargs)
+
+    async def set_volume(self, device_id: str, level: int) -> dict[str, Any]:
+        """Set the device speaker volume level.
+
+        Args:
+            device_id: The device manufacturer ID.
+            level: Volume level (1–7).
+
+        Returns:
+            API response dict.
+        """
+        return await self.update_configuration(device_id, volumeLevel=level)
+
+    async def set_child_lock(self, device_id: str, enabled: bool) -> dict[str, Any]:
+        """Enable or disable the child lock.
+
+        Args:
+            device_id: The device manufacturer ID.
+            enabled: True to enable, False to disable.
+
+        Returns:
+            API response dict.
+        """
+        return await self.update_configuration(device_id, childLock=int(enabled))
+
+    async def set_auto_lock(self, device_id: str, seconds: int) -> dict[str, Any]:
+        """Set the auto-lock timeout in seconds.
+
+        Args:
+            device_id: The device manufacturer ID.
+            seconds: Timeout in seconds (0 to disable).
+
+        Returns:
+            API response dict.
+        """
+        return await self.update_configuration(device_id, autoLock=seconds)
+
+    async def set_extra_dry(self, device_id: str, enabled: bool) -> dict[str, Any]:
+        """Enable or disable the extra dry cycle.
+
+        Args:
+            device_id: The device manufacturer ID.
+            enabled: True to enable, False to disable.
+
+        Returns:
+            API response dict.
+        """
+        return await self.update_configuration(device_id, extraDry=enabled)
+
+    async def set_cat_delay(self, device_id: str, seconds: int) -> dict[str, Any]:
+        """Set the delay after cat detection before starting a cycle.
+
+        Args:
+            device_id: The device manufacturer ID.
+            seconds: Delay in seconds.
+
+        Returns:
+            API response dict.
+        """
+        return await self.update_configuration(device_id, catDelay=seconds)
+
+    async def set_cat_sensitivity(self, device_id: str, value: int) -> dict[str, Any]:
+        """Set the cat sensor sensitivity.
+
+        Args:
+            device_id: The device manufacturer ID.
+            value: Sensitivity value.
+
+        Returns:
+            API response dict.
+        """
+        return await self.update_configuration(device_id, catSense=value)
+
+    async def set_cleaning_mode(
+        self, device_id: str, mode: CleaningMode
+    ) -> dict[str, Any]:
+        """Set the cleaning trigger mode (automatic or manual).
+
+        Args:
+            device_id: The device manufacturer ID.
+            mode: CleaningMode.AUTOMATIC or CleaningMode.MANUAL.
+
+        Returns:
+            API response dict.
+        """
+        return await self.update_configuration(device_id, mode=int(mode))
+
+    async def set_schedule(
+        self, device_id: str, entries: list[ScheduleEntry]
+    ) -> dict[str, Any]:
+        """Set the cleaning schedule.
+
+        Args:
+            device_id: The device manufacturer ID.
+            entries: List of ScheduleEntry objects defining the schedule.
+
+        Returns:
+            API response dict.
+        """
+        schedule_data = [
+            entry.model_dump(by_alias=True, exclude_none=True) for entry in entries
+        ]
+        return await self.update_configuration(device_id, schedule=schedule_data)
+
+    async def set_dnd(
+        self, device_id: str, from_time: str, to_time: str
+    ) -> dict[str, Any]:
+        """Set the Do Not Disturb window.
+
+        Args:
+            device_id: The device manufacturer ID.
+            from_time: Start time in "HH:MM" format.
+            to_time: End time in "HH:MM" format.
+
+        Returns:
+            API response dict.
+        """
+        return await self.update_configuration(
+            device_id, dndFrom=from_time, dndTo=to_time
+        )

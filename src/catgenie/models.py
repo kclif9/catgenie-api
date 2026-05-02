@@ -167,12 +167,26 @@ class DeviceConfiguration(BaseModel):
 class OperationStatus(BaseModel):
     """Real-time cleaning operation state and progress."""
 
-    model_config = _strict
+    model_config = _lenient
 
     # 0 = idle, 1 = running
     state: OperationState = Field(alias="state")
     # 255 = idle/complete, 0–100 = progress percentage while running
     progress: int = Field(alias="progress")
+    # Error string during an operation (empty when no error)
+    error: str = Field("", alias="error")
+    # Cat sensor detection value (non-None when cat detected)
+    sens: str | None = Field(None, alias="sens")
+    # Real-time clock value from the device
+    rtc: str | None = Field(None, alias="rtc")
+    # Operation mode during cycle
+    mode: int = Field(0, alias="mode")
+    # Manual flag during operation
+    manual: int = Field(0, alias="manual")
+    # Current step number in the cleaning cycle
+    step_num: int = Field(0, alias="stepNum")
+    # Relay hardware mode
+    relay_mode: int | None = Field(None, alias="relayMode")
 
     @property
     def is_cleaning(self) -> bool:
@@ -183,6 +197,16 @@ class OperationStatus(BaseModel):
     def clean_progress_pct(self) -> int | None:
         """Progress percentage, or None when idle."""
         return None if self.progress == 255 else self.progress
+
+    @property
+    def has_error(self) -> bool:
+        """Return True when an error string is present."""
+        return bool(self.error)
+
+    @property
+    def is_cat_detected(self) -> bool:
+        """Return True when the cat sensor reports detection."""
+        return self.sens is not None and self.sens != ""
 
 
 class UpdateGroup(BaseModel):
