@@ -210,3 +210,47 @@ class TestUpdateConfiguration:
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"childLock": 1, "volumeLevel": 5, "extraDry": True}
+
+    @pytest.mark.asyncio
+    async def test_set_extra_wash_enabled(self) -> None:
+        session = _make_mock_session()
+        creds = _make_credentials()
+
+        async with CatGenieClient(creds, session=session) as client:
+            await client.set_extra_wash("DEV001", True)
+
+        data = json.loads(session.request.call_args[1]["data"])
+        assert data == {"binaryElements": {"EXTRA_WASH": True}}
+
+    @pytest.mark.asyncio
+    async def test_set_extra_wash_disabled(self) -> None:
+        session = _make_mock_session()
+        creds = _make_credentials()
+
+        async with CatGenieClient(creds, session=session) as client:
+            await client.set_extra_wash("DEV001", False)
+
+        data = json.loads(session.request.call_args[1]["data"])
+        assert data == {"binaryElements": {"EXTRA_WASH": False}}
+
+    @pytest.mark.asyncio
+    async def test_set_extra_shake_enabled(self) -> None:
+        session = _make_mock_session()
+        creds = _make_credentials()
+
+        async with CatGenieClient(creds, session=session) as client:
+            await client.set_extra_shake("DEV001", True)
+
+        data = json.loads(session.request.call_args[1]["data"])
+        assert data == {"binaryElements": {"EXTRA_SHAKE": True}}
+
+    @pytest.mark.asyncio
+    async def test_set_extra_shake_disabled(self) -> None:
+        session = _make_mock_session()
+        creds = _make_credentials()
+
+        async with CatGenieClient(creds, session=session) as client:
+            await client.set_extra_shake("DEV001", False)
+
+        data = json.loads(session.request.call_args[1]["data"])
+        assert data == {"binaryElements": {"EXTRA_SHAKE": False}}

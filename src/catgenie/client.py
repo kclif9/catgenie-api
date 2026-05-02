@@ -356,3 +356,31 @@ class CatGenieClient:
         return await self.update_configuration(
             device_id, dndFrom=from_time, dndTo=to_time
         )
+
+    async def set_extra_wash(self, device_id: str, enabled: bool) -> dict[str, Any]:
+        """Enable or disable the 4-wash cycle (extra wash).
+
+        Args:
+            device_id: The device manufacturer ID.
+            enabled: True to enable, False to disable.
+
+        Returns:
+            API response dict.
+        """
+        return await self.update_configuration(
+            device_id, binaryElements={"EXTRA_WASH": enabled}
+        )
+
+    async def set_extra_shake(self, device_id: str, enabled: bool) -> dict[str, Any]:
+        """Enable or disable the arm shake cycle.
+
+        Args:
+            device_id: The device manufacturer ID.
+            enabled: True to enable, False to disable.
+
+        Returns:
+            API response dict.
+        """
+        return await self.update_configuration(
+            device_id, binaryElements={"EXTRA_SHAKE": enabled}
+        )
