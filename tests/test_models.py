@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 from catgenie.models import (
@@ -234,6 +234,32 @@ class TestDevice:
         device = Device.model_validate(FULL_DEVICE_PAYLOAD)
         assert isinstance(device.last_clean, datetime)
 
+    def test_last_clean_is_utc(self) -> None:
+        device = Device.model_validate(FULL_DEVICE_PAYLOAD)
+        assert device.last_clean is not None
+        assert device.last_clean.tzinfo == timezone.utc
+
+    def test_activation_date_is_utc(self) -> None:
+        device = Device.model_validate(FULL_DEVICE_PAYLOAD)
+        assert device.configuration.activation is not None
+        assert device.configuration.activation.date.tzinfo == timezone.utc
+
+    def test_naive_datetime_gets_utc_attached(self) -> None:
+        """A naive datetime string from the API is treated as UTC."""
+        payload = {**FULL_DEVICE_PAYLOAD, "lastClean": "2025-06-15T12:00:00"}
+        device = Device.model_validate(payload)
+        assert device.last_clean is not None
+        assert device.last_clean.tzinfo == timezone.utc
+        assert device.last_clean.hour == 12
+
+    def test_non_utc_datetime_converted_to_utc(self) -> None:
+        """A timezone-aware non-UTC datetime is converted to UTC."""
+        payload = {**FULL_DEVICE_PAYLOAD, "lastClean": "2025-06-15T12:00:00+05:00"}
+        device = Device.model_validate(payload)
+        assert device.last_clean is not None
+        assert device.last_clean.tzinfo == timezone.utc
+        assert device.last_clean.hour == 7
+
     def test_total_cycles_via_configuration(self) -> None:
         device = Device.model_validate(FULL_DEVICE_PAYLOAD)
         assert device.configuration.total_cycles == 600
@@ -278,6 +304,17 @@ class TestNotificationModels:
         assert parsed.parent_device_id == "CGR1234567"
         assert parsed.version == "8.7.205R"
         assert parsed.device_name == "Living Room"
+
+    def test_notification_creation_time_is_utc(self) -> None:
+        nl = NotificationList.model_validate(NOTIFICATION_PAYLOAD)
+        assert nl.notifications[0].creation_time.tzinfo == timezone.utc
+
+    def test_notification_event_timestamp_is_utc(self) -> None:
+        nl = NotificationList.model_validate(NOTIFICATION_PAYLOAD)
+        parsed = nl.notifications[0].parsed_data
+        assert parsed is not None
+        assert parsed.event_timestamp is not None
+        assert parsed.event_timestamp.tzinfo == timezone.utc
 
     def test_notification_empty_data_returns_none(self) -> None:
         n = Notification.model_validate(
