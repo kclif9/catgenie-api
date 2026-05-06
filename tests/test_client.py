@@ -43,7 +43,7 @@ class TestUpdateConfiguration:
     """Tests for update_configuration and typed setter methods."""
 
     @pytest.mark.asyncio
-    async def test_update_configuration_sends_put(self) -> None:
+    async def test_update_configuration_sends_post(self) -> None:
         session = _make_mock_session()
         creds = _make_credentials()
 
@@ -52,7 +52,7 @@ class TestUpdateConfiguration:
 
         session.request.assert_called_once()
         call_args = session.request.call_args
-        assert call_args[0][0] == "PUT"
+        assert call_args[0][0] == "POST"
         assert "DEV001/configuration" in call_args[0][1]
         data = json.loads(call_args[1]["data"])
         assert data == {"volumeLevel": 5}
