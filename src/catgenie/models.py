@@ -301,7 +301,7 @@ class NotificationData(BaseModel):
     device_name: str = Field("", alias="deviceName")
     error_type: str = Field("", alias="errorType")
     version: str = Field("", alias="version")
-    event_timestamp: str = Field("", alias="eventTimestamp")
+    event_timestamp: UtcDatetime | None = Field(None, alias="eventTimestamp")
 
 
 class Notification(BaseModel):

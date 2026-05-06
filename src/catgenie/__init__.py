@@ -22,6 +22,7 @@ from .models import (
     RefreshResponse,
     ScheduleEntry,
     UpdateGroup,
+    UtcDatetime,
     WaterConfig,
 )
 from .signing import encrypt_str1, generate_request_headers
@@ -47,6 +48,7 @@ __all__ = [
     "OperationStatus",
     "ScheduleEntry",
     "UpdateGroup",
+    "UtcDatetime",
     "WaterConfig",
     # Auth models
     "LoginResponse",
