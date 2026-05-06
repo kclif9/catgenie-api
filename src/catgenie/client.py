@@ -60,7 +60,7 @@ class CatGenieClient:
         self._auth: CatGenieAuth | None = None
 
     async def async_close(self) -> None:
-        """Close the underlying HTTP session if it was created by this client."""
+        """Close the underlying HTTP session if it was created by this instance."""
         if self._owns_session and self._session is not None:
             await self._session.close()
             self._session = None

@@ -254,3 +254,49 @@ class TestUpdateConfiguration:
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"binaryElements": {"EXTRA_SHAKE": False}}
+
+
+class TestClientSessionLifecycle:
+    """Tests for lazy session creation and async_close() on CatGenieClient."""
+
+    @pytest.mark.asyncio
+    async def test_lazy_session_creation(self) -> None:
+        from unittest.mock import patch
+
+        creds = _make_credentials()
+
+        with patch("catgenie.client.AsyncSession") as mock_session_cls:
+            mock_session = _make_mock_session()
+            mock_session_cls.return_value = mock_session
+
+            client = CatGenieClient(creds)
+            assert client._session is None
+            await client.get_devices()
+            assert client._session is mock_session
+
+    @pytest.mark.asyncio
+    async def test_async_close_owned_session(self) -> None:
+        from unittest.mock import patch
+
+        creds = _make_credentials()
+
+        with patch("catgenie.client.AsyncSession") as mock_session_cls:
+            mock_session = _make_mock_session()
+            mock_session_cls.return_value = mock_session
+
+            client = CatGenieClient(creds)
+            await client.get_devices()  # triggers lazy init
+            await client.async_close()
+
+            mock_session.close.assert_called_once()
+            assert client._session is None
+
+    @pytest.mark.asyncio
+    async def test_injected_session_not_closed(self) -> None:
+        session = _make_mock_session()
+        creds = _make_credentials()
+
+        client = CatGenieClient(creds, session=session)
+        await client.async_close()
+
+        session.close.assert_not_called()

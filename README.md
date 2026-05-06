@@ -40,21 +40,25 @@ import asyncio
 from catgenie import CatGenieAuth, CatGenieClient
 
 async def main():
-    async with CatGenieAuth() as auth:
-        # Step 1 — trigger SMS to the phone number
-        await auth.request_login_code(country_code=61, phone="499999999")
+    auth = CatGenieAuth()
+    # Step 1 — trigger SMS to the phone number
+    await auth.request_login_code(country_code=61, phone="499999999")
 
-        # Step 2 — exchange the SMS code for tokens
-        code = input("Enter SMS code: ")
-        credentials = await auth.login(country_code=61, phone="499999999", code=code)
+    # Step 2 — exchange the SMS code for tokens
+    code = input("Enter SMS code: ")
+    credentials = await auth.login(country_code=61, phone="499999999", code=code)
+    await auth.async_close()
 
     # Step 3 — use the client
-    async with CatGenieClient(credentials) as client:
+    client = CatGenieClient(credentials)
+    try:
         devices = await client.get_devices()
         for device in devices:
             print(f"{device.name}: {'online' if device.is_online else 'offline'}")
             print(f"  Sani-solution remaining: {device.remaining_sani_solution}%")
             print(f"  Lifetime cycles: {device.configuration.total_cycles}")
+    finally:
+        await client.async_close()
 
 asyncio.run(main())
 ```
@@ -62,7 +66,8 @@ asyncio.run(main())
 ### Controlling a Device
 
 ```python
-async with CatGenieClient(credentials) as client:
+client = CatGenieClient(credentials)
+try:
     devices = await client.get_devices()
     device = devices[0]
 
@@ -71,6 +76,8 @@ async with CatGenieClient(credentials) as client:
 
     # Stop a cleaning cycle
     await client.stop_cleaning(device.manufacturer_id)
+finally:
+    await client.async_close()
 ```
 
 ### Token Persistence
@@ -95,12 +102,15 @@ from curl_cffi.requests import AsyncSession, Response
 from catgenie import CatGenieAuth, CatGenieClient
 from catgenie.const import TLS_IMPERSONATE
 
-async with AsyncSession(impersonate=TLS_IMPERSONATE) as session:
-    async with CatGenieAuth(session=session) as auth:
-        credentials = await auth.login(...)
+session = AsyncSession(impersonate=TLS_IMPERSONATE)
+try:
+    auth = CatGenieAuth(session=session)
+    credentials = await auth.login(...)
 
-    async with CatGenieClient(credentials, session=session) as client:
-        devices = await client.get_devices()
+    client = CatGenieClient(credentials, session=session)
+    devices = await client.get_devices()
+finally:
+    await session.close()
 ```
 
 ## API Reference
