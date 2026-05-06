@@ -25,7 +25,6 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass
-from types import TracebackType
 from typing import Any, Literal, cast
 
 from curl_cffi.requests import AsyncSession, Response
@@ -68,11 +67,15 @@ class Credentials:
 class CatGenieAuth:
     """Handles the CatGenie phone-number authentication flow.
 
-    Usage:
-        async with CatGenieAuth() as auth:
-            await auth.request_login_code(country_code=60, phone="400000000")
-            code = input("SMS code: ")
-            creds = await auth.login(country_code=60, phone="400000000", code=code)
+    Usage::
+
+        auth = CatGenieAuth()
+        await auth.request_login_code(country_code=60, phone="400000000")
+        code = input("SMS code: ")
+        creds = await auth.login(country_code=60, phone="400000000", code=code)
+
+        # On teardown:
+        await auth.async_close()
     """
 
     def __init__(
@@ -88,19 +91,8 @@ class CatGenieAuth:
         self._secret = secret
         self.credentials = Credentials(secret=secret)
 
-    async def __aenter__(self) -> CatGenieAuth:
-        """Enter the async context manager, creating a session if needed."""
-        if self._session is None:
-            self._session = AsyncSession(impersonate=TLS_IMPERSONATE)
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        """Exit the async context manager, closing the session if owned."""
+    async def async_close(self) -> None:
+        """Close the underlying HTTP session if it was created by this client."""
         if self._owns_session and self._session is not None:
             await self._session.close()
             self._session = None
@@ -139,7 +131,7 @@ class CatGenieAuth:
         token: str = "",
     ) -> Any:
         if self._session is None:
-            raise RuntimeError("CatGenieAuth must be used as an async context manager")
+            self._session = AsyncSession(impersonate=TLS_IMPERSONATE)
         headers = self._build_headers(path, method, body, params, require_hmac)
         if token:
             headers["authorization"] = f"Bearer {token}"

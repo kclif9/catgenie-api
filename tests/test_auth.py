@@ -83,25 +83,46 @@ class TestCatGenieAuth:
         return resp
 
     @pytest.mark.asyncio
-    async def test_context_manager_creates_and_closes_session(self) -> None:
+    async def test_lazy_session_creation(self) -> None:
         from catgenie.auth import CatGenieAuth
 
         with patch("catgenie.auth.AsyncSession") as mock_session_cls:
             mock_session = AsyncMock()
+            mock_session.request.return_value = self._make_mock_response(
+                json_data={"url": "https://example.com"}
+            )
             mock_session_cls.return_value = mock_session
 
-            async with CatGenieAuth() as auth:
-                assert auth._session is mock_session
+            auth = CatGenieAuth()
+            assert auth._session is None
+            await auth.get_base_url(61, "499999999")
+            assert auth._session is mock_session
+
+    @pytest.mark.asyncio
+    async def test_async_close_owned_session(self) -> None:
+        from catgenie.auth import CatGenieAuth
+
+        with patch("catgenie.auth.AsyncSession") as mock_session_cls:
+            mock_session = AsyncMock()
+            mock_session.request.return_value = self._make_mock_response(
+                json_data={"url": "https://example.com"}
+            )
+            mock_session_cls.return_value = mock_session
+
+            auth = CatGenieAuth()
+            await auth.get_base_url(61, "499999999")  # triggers lazy init
+            await auth.async_close()
 
             mock_session.close.assert_called_once()
+            assert auth._session is None
 
     @pytest.mark.asyncio
     async def test_injected_session_not_closed(self) -> None:
         from catgenie.auth import CatGenieAuth
 
         mock_session = AsyncMock()
-        async with CatGenieAuth(session=mock_session) as auth:
-            assert auth._session is mock_session
+        auth = CatGenieAuth(session=mock_session)
+        await auth.async_close()
 
         mock_session.close.assert_not_called()
 
@@ -118,8 +139,8 @@ class TestCatGenieAuth:
             mock_session.request.return_value = resp
             mock_session_cls.return_value = mock_session
 
-            async with CatGenieAuth() as auth:
-                result = await auth.get_base_url(61, "499999999")
+            auth = CatGenieAuth()
+            result = await auth.get_base_url(61, "499999999")
 
         assert result["url"] == "https://iot.petnovations.com"
 
@@ -134,8 +155,8 @@ class TestCatGenieAuth:
             mock_session.request.return_value = resp
             mock_session_cls.return_value = mock_session
 
-            async with CatGenieAuth() as auth:
-                result = await auth.request_login_code(61, "499999999")
+            auth = CatGenieAuth()
+            result = await auth.request_login_code(61, "499999999")
 
         assert result["status"] == 200
 
@@ -158,8 +179,8 @@ class TestCatGenieAuth:
             mock_session.request.return_value = resp
             mock_session_cls.return_value = mock_session
 
-            async with CatGenieAuth() as auth:
-                creds = await auth.login(61, "499999999", "123456")
+            auth = CatGenieAuth()
+            creds = await auth.login(61, "499999999", "123456")
 
         assert creds.access_token == "access.jwt.token"
         assert creds.refresh_token == "refresh.jwt.token"
@@ -177,9 +198,9 @@ class TestCatGenieAuth:
             mock_session.request.return_value = resp
             mock_session_cls.return_value = mock_session
 
-            async with CatGenieAuth() as auth:
-                with pytest.raises(CatGenieAuthenticationError, match="Login failed"):
-                    await auth.login(61, "499999999", "000000")
+            auth = CatGenieAuth()
+            with pytest.raises(CatGenieAuthenticationError, match="Login failed"):
+                await auth.login(61, "499999999", "000000")
 
     @pytest.mark.asyncio
     async def test_login_non_200_raises_auth_error(self) -> None:
@@ -192,9 +213,9 @@ class TestCatGenieAuth:
             mock_session.request.return_value = resp
             mock_session_cls.return_value = mock_session
 
-            async with CatGenieAuth() as auth:
-                with pytest.raises(CatGenieAuthenticationError):
-                    await auth.login(61, "499999999", "000000")
+            auth = CatGenieAuth()
+            with pytest.raises(CatGenieAuthenticationError):
+                await auth.login(61, "499999999", "000000")
 
     @pytest.mark.asyncio
     async def test_refresh_success(self) -> None:
@@ -211,9 +232,9 @@ class TestCatGenieAuth:
             mock_session.request.return_value = resp
             mock_session_cls.return_value = mock_session
 
-            async with CatGenieAuth() as auth:
-                auth.credentials.refresh_token = "existing.refresh.token"
-                creds = await auth.refresh()
+            auth = CatGenieAuth()
+            auth.credentials.refresh_token = "existing.refresh.token"
+            creds = await auth.refresh()
 
         assert creds.access_token == "new.access.token"
         assert creds.is_token_expired is False
@@ -226,16 +247,21 @@ class TestCatGenieAuth:
             mock_session = AsyncMock()
             mock_session_cls.return_value = mock_session
 
-            async with CatGenieAuth() as auth:
-                with pytest.raises(
-                    CatGenieAuthenticationError, match="No refresh token"
-                ):
-                    await auth.refresh()
+            auth = CatGenieAuth()
+            with pytest.raises(CatGenieAuthenticationError, match="No refresh token"):
+                await auth.refresh()
 
     @pytest.mark.asyncio
-    async def test_request_without_context_manager_raises(self) -> None:
+    async def test_request_without_context_manager_works(self) -> None:
         from catgenie.auth import CatGenieAuth
 
-        auth = CatGenieAuth()
-        with pytest.raises(RuntimeError, match="context manager"):
-            await auth.get_base_url(61, "499999999")
+        resp = self._make_mock_response(json_data={"url": "https://example.com"})
+        with patch("catgenie.auth.AsyncSession") as mock_session_cls:
+            mock_session = AsyncMock()
+            mock_session.request.return_value = resp
+            mock_session_cls.return_value = mock_session
+
+            auth = CatGenieAuth()
+            result = await auth.get_base_url(61, "499999999")
+
+        assert result["url"] == "https://example.com"

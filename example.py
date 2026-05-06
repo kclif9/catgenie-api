@@ -10,7 +10,8 @@ async def main() -> None:
     country_code = int(input("Country code (e.g. 61): "))
     phone = input("Phone number (without country code): ")
 
-    async with CatGenieAuth() as auth:
+    auth = CatGenieAuth()
+    try:
         # Mirror app flow: config/v1/url is always called first (preflight)
         await auth.get_base_url(country_code, phone)
         print("config/v1/url: OK")
@@ -21,11 +22,16 @@ async def main() -> None:
 
         code = input("Enter the SMS code: ")
         creds = await auth.login(country_code=country_code, phone=phone, code=code)
+    finally:
+        await auth.async_close()
 
     print("\nAuthenticated (refresh token expires ~10 years)")
 
-    async with CatGenieClient(creds) as client:
+    client = CatGenieClient(creds)
+    try:
         devices = await client.get_devices()
+    finally:
+        await client.async_close()
 
     print(f"\nFound {len(devices)} device(s):\n")
     for dev in devices:

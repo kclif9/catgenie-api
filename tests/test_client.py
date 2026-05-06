@@ -47,8 +47,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.update_configuration("DEV001", volumeLevel=5)
+        client = CatGenieClient(creds, session=session)
+        await client.update_configuration("DEV001", volumeLevel=5)
 
         session.request.assert_called_once()
         call_args = session.request.call_args
@@ -62,8 +62,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_volume("DEV001", 3)
+        client = CatGenieClient(creds, session=session)
+        await client.set_volume("DEV001", 3)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"volumeLevel": 3}
@@ -73,8 +73,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_child_lock("DEV001", True)
+        client = CatGenieClient(creds, session=session)
+        await client.set_child_lock("DEV001", True)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"childLock": 1}
@@ -84,8 +84,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_child_lock("DEV001", False)
+        client = CatGenieClient(creds, session=session)
+        await client.set_child_lock("DEV001", False)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"childLock": 0}
@@ -95,8 +95,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_auto_lock("DEV001", 300)
+        client = CatGenieClient(creds, session=session)
+        await client.set_auto_lock("DEV001", 300)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"autoLock": 300}
@@ -106,8 +106,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_extra_dry("DEV001", True)
+        client = CatGenieClient(creds, session=session)
+        await client.set_extra_dry("DEV001", True)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"extraDry": True}
@@ -117,8 +117,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_extra_dry("DEV001", False)
+        client = CatGenieClient(creds, session=session)
+        await client.set_extra_dry("DEV001", False)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"extraDry": False}
@@ -128,8 +128,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_cat_delay("DEV001", 900)
+        client = CatGenieClient(creds, session=session)
+        await client.set_cat_delay("DEV001", 900)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"catDelay": 900}
@@ -139,8 +139,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_cat_sensitivity("DEV001", 20)
+        client = CatGenieClient(creds, session=session)
+        await client.set_cat_sensitivity("DEV001", 20)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"catSense": 20}
@@ -150,8 +150,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_cleaning_mode("DEV001", CleaningMode.AUTOMATIC)
+        client = CatGenieClient(creds, session=session)
+        await client.set_cleaning_mode("DEV001", CleaningMode.AUTOMATIC)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"mode": 0}
@@ -161,8 +161,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_cleaning_mode("DEV001", CleaningMode.MANUAL)
+        client = CatGenieClient(creds, session=session)
+        await client.set_cleaning_mode("DEV001", CleaningMode.MANUAL)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"mode": 1}
@@ -176,8 +176,8 @@ class TestUpdateConfiguration:
             ScheduleEntry(day=3, hour=14, minute=30, enabled=True),
         ]
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_schedule("DEV001", entries)
+        client = CatGenieClient(creds, session=session)
+        await client.set_schedule("DEV001", entries)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {
@@ -192,8 +192,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_dnd("DEV001", "22:00", "07:00")
+        client = CatGenieClient(creds, session=session)
+        await client.set_dnd("DEV001", "22:00", "07:00")
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"dndFrom": "22:00", "dndTo": "07:00"}
@@ -203,10 +203,10 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.update_configuration(
-                "DEV001", childLock=1, volumeLevel=5, extraDry=True
-            )
+        client = CatGenieClient(creds, session=session)
+        await client.update_configuration(
+            "DEV001", childLock=1, volumeLevel=5, extraDry=True
+        )
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"childLock": 1, "volumeLevel": 5, "extraDry": True}
@@ -216,8 +216,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_extra_wash("DEV001", True)
+        client = CatGenieClient(creds, session=session)
+        await client.set_extra_wash("DEV001", True)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"binaryElements": {"EXTRA_WASH": True}}
@@ -227,8 +227,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_extra_wash("DEV001", False)
+        client = CatGenieClient(creds, session=session)
+        await client.set_extra_wash("DEV001", False)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"binaryElements": {"EXTRA_WASH": False}}
@@ -238,8 +238,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_extra_shake("DEV001", True)
+        client = CatGenieClient(creds, session=session)
+        await client.set_extra_shake("DEV001", True)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"binaryElements": {"EXTRA_SHAKE": True}}
@@ -249,8 +249,8 @@ class TestUpdateConfiguration:
         session = _make_mock_session()
         creds = _make_credentials()
 
-        async with CatGenieClient(creds, session=session) as client:
-            await client.set_extra_shake("DEV001", False)
+        client = CatGenieClient(creds, session=session)
+        await client.set_extra_shake("DEV001", False)
 
         data = json.loads(session.request.call_args[1]["data"])
         assert data == {"binaryElements": {"EXTRA_SHAKE": False}}
