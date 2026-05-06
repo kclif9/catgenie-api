@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from types import TracebackType
 from typing import Any, Literal
 
 from curl_cffi.requests import AsyncSession, Response
@@ -38,9 +37,13 @@ _HttpMethod = Literal[
 class CatGenieClient:
     """Async client for CatGenie device management.
 
-    Usage:
-        async with CatGenieClient(credentials) as client:
-            devices = await client.get_devices()
+    Usage::
+
+        client = CatGenieClient(credentials)
+        devices = await client.get_devices()
+
+        # On teardown:
+        await client.async_close()
     """
 
     def __init__(
@@ -56,19 +59,8 @@ class CatGenieClient:
         self._base_url = base_url.rstrip("/")
         self._auth: CatGenieAuth | None = None
 
-    async def __aenter__(self) -> CatGenieClient:
-        """Enter the async context manager, creating a session if needed."""
-        if self._session is None:
-            self._session = AsyncSession(impersonate=TLS_IMPERSONATE)
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        """Exit the async context manager, closing the session if owned."""
+    async def async_close(self) -> None:
+        """Close the underlying HTTP session if it was created by this instance."""
         if self._owns_session and self._session is not None:
             await self._session.close()
             self._session = None
@@ -110,9 +102,7 @@ class CatGenieClient:
         params: dict[str, Any] | None = None,
     ) -> Any:
         if self._session is None:
-            raise RuntimeError(
-                "CatGenieClient must be used as an async context manager"
-            )
+            self._session = AsyncSession(impersonate=TLS_IMPERSONATE)
         await self._ensure_token()
         url = f"{self._base_url}/{path.lstrip('/')}"
         data = (
