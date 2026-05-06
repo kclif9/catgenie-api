@@ -235,7 +235,7 @@ class CatGenieClient:
             CatGenieAPIError: If the API returns a non-2xx response.
         """
         path = ENDPOINT_DEVICE_CONFIG.format(device_id=device_id)
-        return await self._request("POST", path, body=kwargs)
+        return await self._request("PUT", path, body=kwargs)
 
     async def set_volume(self, device_id: str, level: int) -> dict[str, Any]:
         """Set the device speaker volume level.
