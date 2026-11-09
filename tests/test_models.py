@@ -58,6 +58,19 @@ class TestOperationStatus:
         assert s.is_cleaning is True
         assert s.clean_progress_pct == 42
 
+    def test_unknown_state_is_preserved_not_rejected(self) -> None:
+        # A real device reported state=2 during a water-fill fault; the model
+        # must preserve the raw value instead of raising a ValidationError.
+        # (ref: PrimeAutomation/HA-Catgenie#3)
+        s = OperationStatus.model_validate({"state": 2, "progress": 255})
+        assert s.state == 2
+        assert s.is_cleaning is False
+
+    def test_high_unknown_state_is_preserved(self) -> None:
+        s = OperationStatus.model_validate({"state": 7, "progress": 255})
+        assert s.state == 7
+        assert s.is_cleaning is False
+
     def test_progress_zero_is_not_none(self) -> None:
         s = OperationStatus.model_validate({"state": 1, "progress": 0})
         assert s.clean_progress_pct == 0
@@ -221,6 +234,18 @@ class TestDevice:
         }
         device = Device.model_validate(payload)
         assert device.is_cleaning is True
+
+    def test_unknown_operation_state_keeps_device_valid(self) -> None:
+        # Regression: an unmapped operation state must not fail Device
+        # validation and take every reading on the account down with it.
+        # (ref: PrimeAutomation/HA-Catgenie#3)
+        payload = {
+            **FULL_DEVICE_PAYLOAD,
+            "operationStatus": {"state": 2, "progress": 255},
+        }
+        device = Device.model_validate(payload)
+        assert device.operation_status.state == 2
+        assert device.is_cleaning is False
 
     def test_unique_id_is_manufacturer_id(self) -> None:
         device = Device.model_validate(FULL_DEVICE_PAYLOAD)
