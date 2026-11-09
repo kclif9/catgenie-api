@@ -60,10 +60,35 @@ class DeviceStatus(IntEnum):
 
 
 class OperationState(IntEnum):
-    """Current cleaning-cycle operation state."""
+    """Known cleaning-cycle operation states.
+
+    The device reports additional state codes we have not mapped (seen during
+    fault conditions), so ``OperationStatus.state`` is tolerant of unknown
+    values — see ``_coerce_operation_state``. Add members here as their meaning
+    is confirmed.
+    """
 
     IDLE = 0
     RUNNING = 1
+
+
+def _coerce_operation_state(value: int) -> OperationState | int:
+    """Return the enum member for a known state, else keep the raw integer.
+
+    Real devices report operation-state codes beyond the ones mapped above (for
+    example during a water-fill fault). Preserving the raw value keeps the whole
+    device payload valid instead of raising a ValidationError that would make
+    every reading on the account unavailable.
+    """
+    try:
+        return OperationState(value)
+    except ValueError:
+        return value
+
+
+# An int that resolves to an OperationState member when recognized, and is left
+# as the raw int otherwise. Unknown states never fail validation.
+OperationStateValue = Annotated[int, AfterValidator(_coerce_operation_state)]
 
 
 class CleaningMode(IntEnum):
@@ -169,8 +194,8 @@ class OperationStatus(BaseModel):
 
     model_config = _lenient
 
-    # 0 = idle, 1 = running
-    state: OperationState = Field(alias="state")
+    # 0 = idle, 1 = running; unrecognized codes are preserved as raw ints
+    state: OperationStateValue = Field(alias="state")
     # 255 = idle/complete, 0–100 = progress percentage while running
     progress: int = Field(alias="progress")
     # Error string during an operation (empty when no error)
